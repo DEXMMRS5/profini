@@ -5,6 +5,16 @@ export interface Artisan {
   nom: string
   email: string
   tel?: string
+  nom_entreprise?: string
+  siret?: string
+  adresse?: string
+  code_postal?: string
+  ville?: string
+  site_web?: string
+  description_activite?: string
+  mention_tva?: string
+  photo_url?: string
+  logo_url?: string
   created_at: string
 }
 
