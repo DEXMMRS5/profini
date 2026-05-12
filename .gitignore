@@ -40,8 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# generated icons (rebuilt at deploy)
-/public/icons/
-
 # handoff files
-/scripts/
+/handoff-extracted/

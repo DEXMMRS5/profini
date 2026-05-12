@@ -1,44 +1,66 @@
 'use client'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
 import { createClient } from '@/lib/supabase/client'
 import MobileShell from '@/components/MobileShell'
 import StatusBar from '@/components/StatusBar'
 import ProFiniLogo from '@/components/ProFiniLogo'
 import Badge from '@/components/Badge'
-import { Chantier, Artisan, formatEur } from '@/lib/types'
+import { Chantier, Artisan, ChantierStatus, formatEur } from '@/lib/types'
 import {
   IconSearch, IconBell, IconTrendingUp, IconClock, IconCheck,
   IconCalendar, IconEuro, IconChevronRight, IconPlus,
-  IconHome, IconBriefcase, IconSettings, IconDots, IconLogOut,
+  IconHome, IconBriefcase, IconSettings, IconX,
 } from '@/components/icons'
 
 const PRIMARY = '#15355B'
 const ACCENT  = '#2BA464'
 
-function iconBtn(color = '#4B5563') {
-  return {
-    width: 40, height: 40, borderRadius: 12,
-    background: 'transparent', border: 'none', cursor: 'pointer',
-    color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    position: 'relative' as const,
-  }
-}
-
 export default function DashboardClient({ artisan, chantiers }: { artisan: Artisan | null; chantiers: Chantier[] }) {
   const router = useRouter()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const ca = chantiers
     .filter(c => c.status === 'encours' || c.status === 'impaye')
     .reduce((sum, c) => sum + c.montant_ttc, 0)
-
   const enAttente = chantiers.filter(c => c.status === 'encours' || c.status === 'impaye').length
   const clotures  = chantiers.filter(c => c.status === 'cloture').length
 
-  const actifs = chantiers.filter(c => c.status !== 'cloture')
+  const actifs = chantiers
+    .filter(c => c.status !== 'cloture')
+    .filter(c => !searchQuery || c.nom_client.toLowerCase().includes(searchQuery.toLowerCase()) || c.type_travaux.toLowerCase().includes(searchQuery.toLowerCase()))
 
   function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   }
+
+  useGSAP(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+    // Welcome text
+    tl.fromTo('.dash-welcome', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5 }, 0.1)
+
+    // Hero card
+    tl.fromTo(heroRef.current,
+      { opacity: 0, y: 24, scale: 0.97 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6 }, 0.2)
+
+    // Stat cards
+    tl.fromTo('.stat-card',
+      { opacity: 0, y: 16 },
+      { opacity: 1, y: 0, duration: 0.45, stagger: 0.1 }, 0.35)
+
+    // Chantier cards
+    tl.fromTo('.chantier-card',
+      { opacity: 0, x: -20 },
+      { opacity: 1, x: 0, duration: 0.4, stagger: 0.08 }, 0.5)
+
+  }, { scope: containerRef })
 
   async function handleLogout() {
     const supabase = createClient()
@@ -48,11 +70,10 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
 
   return (
     <MobileShell>
-      <div style={{
-        width: '100%', height: '100%', minHeight: '100vh',
-        background: '#F9FAFB', display: 'flex', flexDirection: 'column',
+      <div ref={containerRef} style={{
+        width: '100%', minHeight: '100vh', background: '#F9FAFB',
+        display: 'flex', flexDirection: 'column',
         fontFamily: 'Inter, system-ui, sans-serif', color: '#111827',
-        position: 'relative',
       }}>
         <StatusBar />
 
@@ -68,18 +89,42 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
             <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.3, color: PRIMARY }}>ProFini</span>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
-            <button style={iconBtn()}><IconSearch size={20} sw={2} /></button>
-            <button onClick={handleLogout} style={iconBtn()} title="Déconnexion">
-              <IconLogOut size={20} sw={2} />
+            <button onClick={() => setSearchOpen(o => !o)} style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: searchOpen ? `${PRIMARY}10` : 'transparent',
+              border: 'none', cursor: 'pointer',
+              color: searchOpen ? PRIMARY : '#4B5563',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all .2s',
+            }}>
+              {searchOpen ? <IconX size={20} sw={2} /> : <IconSearch size={20} sw={2} />}
+            </button>
+            <button onClick={() => router.push('/settings')} style={{
+              width: 40, height: 40, borderRadius: 12, background: 'transparent',
+              border: 'none', cursor: 'pointer', color: '#4B5563',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <IconBell size={20} sw={2} />
             </button>
           </div>
         </div>
 
-        {/* Scrollable content */}
+        {/* Search bar */}
+        {searchOpen && (
+          <div style={{ padding: '10px 16px', background: '#fff', borderBottom: '0.5px solid #E5E7EB', animation: 'slideUp .2s ease-out' }}>
+            <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un client, un chantier…"
+              style={{ width: '100%', height: 40, padding: '0 14px', fontSize: 15,
+                fontFamily: 'inherit', color: '#111827', background: '#F3F4F6',
+                border: '1px solid #E5E7EB', borderRadius: 10, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+        )}
+
+        {/* Scroll content */}
         <div className="pf-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 140px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
           {/* Welcome */}
-          <div>
+          <div className="dash-welcome" style={{ opacity: 0 }}>
             <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Bonjour 👋</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginTop: 2 }}>
               {artisan?.nom ?? 'Artisan'}
@@ -87,17 +132,14 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
           </div>
 
           {/* Hero card */}
-          <div style={{
-            position: 'relative', overflow: 'hidden',
+          <div ref={heroRef} style={{ opacity: 0, position: 'relative', overflow: 'hidden',
             background: `linear-gradient(135deg, ${PRIMARY} 0%, #0A2240 100%)`,
             borderRadius: 16, padding: 24, color: '#fff',
-            boxShadow: `0 4px 14px ${PRIMARY}40`,
-          }}>
-            <div style={{
-              position: 'absolute', right: -30, top: -30, width: 160, height: 160,
-              borderRadius: '50%', background: `radial-gradient(circle, ${ACCENT}55, transparent 70%)`,
-              pointerEvents: 'none',
-            }} />
+            boxShadow: `0 8px 28px ${PRIMARY}40`,
+            cursor: 'pointer',
+          }} onClick={() => router.push('/chantiers-list')}>
+            <div style={{ position: 'absolute', right: -30, top: -30, width: 160, height: 160,
+              borderRadius: '50%', background: `radial-gradient(circle, ${ACCENT}55, transparent 70%)`, pointerEvents: 'none' }} />
             <div style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, opacity: 0.75, fontWeight: 500 }}>
                 <IconTrendingUp size={14} sw={2} />
@@ -117,8 +159,14 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
 
           {/* Stats */}
           <div style={{ display: 'flex', gap: 12 }}>
-            <StatCard icon={<IconClock size={20} />} value={String(enAttente)} label="En attente" accent="#EF9F27" />
-            <StatCard icon={<IconCheck size={20} />} value={String(clotures)} label="Clôturés" accent="#639922" />
+            <div className="stat-card" style={{ opacity: 0, flex: 1 }}
+              onClick={() => router.push('/chantiers-list?filtre=encours')}>
+              <StatCard icon={<IconClock size={20} />} value={String(enAttente)} label="En attente" accent="#EF9F27" />
+            </div>
+            <div className="stat-card" style={{ opacity: 0, flex: 1 }}
+              onClick={() => router.push('/chantiers-list?filtre=cloture')}>
+              <StatCard icon={<IconCheck size={20} />} value={String(clotures)} label="Clôturés" accent="#639922" />
+            </div>
           </div>
 
           {/* Section header */}
@@ -138,79 +186,67 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
           {/* Chantier cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {actifs.length === 0 && (
-              <div style={{
-                textAlign: 'center', padding: '48px 24px',
-                color: '#6B7280', fontSize: 14,
-                background: '#fff', borderRadius: 16, border: '1px solid #E5E7EB',
-              }}>
-                Aucun chantier actif.
-                <br />
-                <button onClick={() => router.push('/chantiers/nouveau')} style={{
-                  marginTop: 12, background: 'none', border: 'none', color: PRIMARY,
-                  fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                  + Créer un chantier
-                </button>
+              <div style={{ textAlign: 'center', padding: '48px 24px', color: '#6B7280', fontSize: 14,
+                background: '#fff', borderRadius: 16, border: '1px solid #E5E7EB' }}>
+                {searchQuery ? 'Aucun résultat pour cette recherche.' : 'Aucun chantier actif.'}
+                {!searchQuery && (
+                  <div>
+                    <button onClick={() => router.push('/chantiers/nouveau')} style={{
+                      marginTop: 12, background: 'none', border: 'none', color: PRIMARY,
+                      fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+                    }}>+ Créer un chantier</button>
+                  </div>
+                )}
               </div>
             )}
-            {actifs.map((c, i) => (
-              <div key={c.id} style={{ animation: `slideUp .4s ease-out ${i * 0.05}s both` }}>
-                <ChantierCard chantier={c} fmtDate={fmtDate} onClick={() => router.push(`/chantiers/${c.id}`)} />
+            {actifs.map((c) => (
+              <div key={c.id} className="chantier-card" style={{ opacity: 0 }}>
+                <ChantierCard chantier={c} fmtDate={fmtDate}
+                  onClick={() => router.push(`/chantiers/${c.id}`)} />
               </div>
             ))}
           </div>
         </div>
 
         {/* FAB */}
-        <button
-          onClick={() => router.push('/chantiers/nouveau')}
-          style={{
-            position: 'fixed', right: 'max(16px, calc(50vw - 215px + 16px))',
-            bottom: 88, width: 60, height: 60,
-            background: PRIMARY, color: '#fff', border: 'none', borderRadius: '50%',
-            boxShadow: `0 6px 20px ${PRIMARY}55`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 10,
-            transition: 'transform .2s, box-shadow .2s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
-          onMouseLeave={e => (e.currentTarget.style.transform = '')}
-        >
+        <button onClick={() => router.push('/chantiers/nouveau')} style={{
+          position: 'fixed',
+          right: 'max(16px, calc(50vw - 215px + 16px))',
+          bottom: 88, width: 60, height: 60,
+          background: PRIMARY, color: '#fff', border: 'none', borderRadius: '50%',
+          boxShadow: `0 6px 20px ${PRIMARY}55`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', zIndex: 10, transition: 'transform .2s, box-shadow .2s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.08)')}
+        onMouseLeave={e => (e.currentTarget.style.transform = '')}>
           <IconPlus size={26} sw={2.5} />
         </button>
 
         {/* Bottom nav */}
-        <div style={{
-          position: 'sticky', bottom: 0,
-          height: 72, background: '#fff',
-          borderTop: '0.5px solid #E5E7EB',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-          paddingBottom: 8, zIndex: 5, flexShrink: 0,
-        }}>
+        <div style={{ position: 'sticky', bottom: 0, height: 72, background: '#fff',
+          borderTop: '0.5px solid #E5E7EB', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-around', paddingBottom: 8, zIndex: 5, flexShrink: 0 }}>
           {[
-            { id: 'home', label: 'Dashboard', Icon: IconHome, active: true },
-            { id: 'chantiers', label: 'Chantiers', Icon: IconBriefcase, active: false },
-            { id: 'settings', label: 'Réglages', Icon: IconSettings, active: false },
-            { id: 'more', label: 'Plus', Icon: IconDots, active: false },
+            { id: 'home',      label: 'Dashboard', icon: IconHome,      path: '/',               active: true },
+            { id: 'chantiers', label: 'Chantiers',  icon: IconBriefcase, path: '/chantiers-list', active: false },
+            { id: 'settings',  label: 'Réglages',   icon: IconSettings,  path: '/settings',       active: false },
           ].map(n => (
-            <button key={n.id} style={{
+            <button key={n.id} onClick={() => router.push(n.path)} style={{
               background: 'none', border: 'none', cursor: 'pointer',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               padding: '8px 12px', minWidth: 56, minHeight: 48,
               color: n.active ? PRIMARY : '#9CA3AF', fontFamily: 'inherit',
+              transition: 'color .2s',
             }}>
-              <n.Icon size={22} sw={n.active ? 2 : 1.75} />
+              <n.icon size={22} sw={n.active ? 2 : 1.75} />
               <span style={{ fontSize: 11, fontWeight: n.active ? 600 : 500 }}>{n.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Home indicator */}
-        <div style={{
-          position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
-          width: 134, height: 5, borderRadius: 100,
-          background: 'rgba(0,0,0,0.2)', zIndex: 20, pointerEvents: 'none',
-        }} />
+        <div style={{ position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
+          width: 134, height: 5, borderRadius: 100, background: 'rgba(0,0,0,0.2)', zIndex: 20, pointerEvents: 'none' }} />
       </div>
     </MobileShell>
   )
@@ -218,17 +254,14 @@ export default function DashboardClient({ artisan, chantiers }: { artisan: Artis
 
 function StatCard({ icon, value, label, accent }: { icon: React.ReactNode; value: string; label: string; accent: string }) {
   return (
-    <div style={{
-      flex: 1, minHeight: 88, padding: 16, borderRadius: 16,
-      background: '#fff', border: '1px solid #E5E7EB',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8,
-    }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10,
-        background: `${accent}1A`, color: accent,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
+    <div style={{ minHeight: 88, padding: 16, borderRadius: 16, background: '#fff', border: '1px solid #E5E7EB',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column',
+      justifyContent: 'space-between', gap: 8, cursor: 'pointer', transition: 'transform .15s',
+    }}
+    onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+    onMouseLeave={e => (e.currentTarget.style.transform = '')}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: `${accent}1A`,
+        color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
       <div>
@@ -241,27 +274,21 @@ function StatCard({ icon, value, label, accent }: { icon: React.ReactNode; value
 
 function ChantierCard({ chantier: c, fmtDate, onClick }: { chantier: Chantier; fmtDate: (d: string) => string; onClick: () => void }) {
   return (
-    <div onClick={onClick} style={{
-      background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16,
+    <div onClick={onClick} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16,
       padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer',
-      transition: 'transform .15s',
+      display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer', transition: 'transform .15s, box-shadow .15s',
     }}
-    onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
-    onMouseLeave={e => (e.currentTarget.style.transform = '')}
-    >
+    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)' }}
+    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#111827', lineHeight: 1.25 }}>{c.nom_client}</div>
           <div style={{ fontSize: 14, color: '#6B7280', marginTop: 2 }}>{c.type_travaux}</div>
         </div>
-        <Badge status={c.status} />
+        <Badge status={c.status as ChantierStatus} />
       </div>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 14,
-        paddingTop: 10, borderTop: '1px solid #F3F4F6',
-        fontSize: 13, color: '#6B7280',
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingTop: 10,
+        borderTop: '1px solid #F3F4F6', fontSize: 13, color: '#6B7280' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <IconCalendar size={14} sw={2} />{fmtDate(c.created_at)}
         </span>
