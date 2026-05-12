@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
+import { useTheme } from '@/context/ThemeContext'
 import { IconX } from './icons'
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function SignatureCanvas({ onChange, onCapture }: Props) {
+  const { theme: T } = useTheme()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
   const lastRef = useRef<{ x: number; y: number } | null>(null)
@@ -22,7 +24,7 @@ export default function SignatureCanvas({ onChange, onCapture }: Props) {
     canvas.height = rect.height * dpr
     const ctx = canvas.getContext('2d')!
     ctx.scale(dpr, dpr)
-    ctx.strokeStyle = '#111827'
+    ctx.strokeStyle = T.dark ? '#F9FAFB' : '#111827'
     ctx.lineWidth = 2.5
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -86,8 +88,8 @@ export default function SignatureCanvas({ onChange, onCapture }: Props) {
         onTouchStart={start} onTouchMove={move} onTouchEnd={end}
         style={{
           width: '100%', height: 280,
-          background: '#fff',
-          border: `2px ${hasInk ? 'solid' : 'dashed'} #D1D5DB`,
+          background: T.card,
+          border: `2px ${hasInk ? 'solid' : 'dashed'} ${T.border}`,
           borderRadius: 12,
           touchAction: 'none', cursor: 'crosshair',
           display: 'block',
@@ -97,7 +99,7 @@ export default function SignatureCanvas({ onChange, onCapture }: Props) {
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', color: '#9CA3AF', fontSize: 15,
+          pointerEvents: 'none', color: T.muted, fontSize: 15,
         }}>
           Signez avec votre doigt
         </div>

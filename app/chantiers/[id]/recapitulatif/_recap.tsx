@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from '@/context/ThemeContext'
 import MobileShell from '@/components/MobileShell'
 import StatusBar from '@/components/StatusBar'
 import FormHeader from '@/components/FormHeader'
@@ -11,57 +12,9 @@ import { IconUser, IconEuro, IconFile, IconMapPin, IconPhone, IconCheck, IconDow
 
 const PRIMARY = '#15355B'
 
-function Card({ children, padding = 16 }: { children: React.ReactNode; padding?: number }) {
-  return (
-    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16, padding, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-      {children}
-    </div>
-  )
-}
-
-function SectionLabel({ children, icon: Ico }: { children: React.ReactNode; icon?: React.ComponentType<{ size?: number; sw?: number }> }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: '#6B7280', padding: '0 4px' }}>
-      {Ico && <Ico size={13} sw={2} />}{children}
-    </div>
-  )
-}
-
-function Row({ label, value, bold, last }: { label: string; value: string; bold?: boolean; last?: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: last ? 'none' : '1px solid #F3F4F6' }}>
-      <span style={{ fontSize: 14, color: bold ? '#111827' : '#6B7280', fontWeight: bold ? 500 : 400 }}>{label}</span>
-      <span style={{ fontSize: bold ? 16 : 14, color: '#111827', fontWeight: bold ? 700 : 500 }}>{value}</span>
-    </div>
-  )
-}
-
-function CheckboxRow({ checked, onToggle, label, subLabel }: { checked: boolean; onToggle: () => void; label: string; subLabel?: string }) {
-  return (
-    <button onClick={onToggle} style={{ width: '100%', minHeight: subLabel ? 72 : 56, padding: '12px 4px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, fontFamily: 'inherit', textAlign: 'left' }}>
-      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${checked ? PRIMARY : '#D1D5DB'}`, background: checked ? PRIMARY : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
-        {checked && <IconCheck size={16} sw={3} color="#fff" />}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 500, color: '#111827' }}>{label}</div>
-        {subLabel && <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{subLabel}</div>}
-      </div>
-    </button>
-  )
-}
-
-function PdfThumbnail() {
-  return (
-    <div style={{ width: 80, height: 110, background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB', padding: 8, boxShadow: '0 2px 6px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ height: 4, background: PRIMARY, borderRadius: 1, width: '70%' }} />
-      {[1,2,3,4].map(i => <div key={i} style={{ height: 2, background: '#E5E7EB', borderRadius: 1, width: i % 2 === 0 ? '80%' : '60%' }} />)}
-      <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 8, fontWeight: 700, color: PRIMARY, letterSpacing: 0.4 }}>PDF</div>
-    </div>
-  )
-}
-
 export default function RecapClient({ chantier }: { chantier: Chantier }) {
   const router = useRouter()
+  const { theme: T } = useTheme()
   const [paid, setPaid] = useState(false)
   const [review, setReview] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -69,69 +22,117 @@ export default function RecapClient({ chantier }: { chantier: Chantier }) {
   const ht  = montantHT(chantier.montant_ttc)
   const tax = tva(chantier.montant_ttc)
 
+  function Card({ children, pad = 16 }: { children: React.ReactNode; pad?: number }) {
+    return <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: pad, boxShadow: T.dark ? 'none' : '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>{children}</div>
+  }
+
+  function SLabel({ children, icon: Ico }: { children: React.ReactNode; icon?: React.ComponentType<{ size?: number; sw?: number }> }) {
+    return <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' as const, color: T.muted, padding: '0 2px' }}>{Ico && <Ico size={12} sw={2} />}{children}</div>
+  }
+
+  function Row({ label, value, bold, last }: { label: string; value: string; bold?: boolean; last?: boolean }) {
+    return <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: last ? 'none' : `1px solid ${T.divider}` }}>
+      <span style={{ fontSize: 14, color: bold ? T.text : T.subtle, fontWeight: bold ? 500 : 400 }}>{label}</span>
+      <span style={{ fontSize: bold ? 16 : 14, color: T.text, fontWeight: bold ? 700 : 500 }}>{value}</span>
+    </div>
+  }
+
+  function CheckRow({ checked, onToggle, label, sub }: { checked: boolean; onToggle: () => void; label: string; sub?: string }) {
+    return <button onClick={onToggle} style={{ width: '100%', padding: '12px 4px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, fontFamily: 'inherit', textAlign: 'left' }}>
+      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${checked ? PRIMARY : T.border}`, background: checked ? PRIMARY : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
+        {checked && <IconCheck size={14} sw={3} color="#fff" />}
+      </div>
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 500, color: T.text }}>{label}</div>
+        {sub && <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{sub}</div>}
+      </div>
+    </button>
+  }
+
   async function handleCloture() {
     setLoading(true)
-    console.log('[recap] cloture start', chantier.id)
-    const res = await fetch(`/api/chantiers/${chantier.id}/cloture`, {
+    await fetch(`/api/chantiers/${chantier.id}/cloture`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paiement_recu: paid, demande_avis: review }),
     })
-    console.log('[recap] cloture end', res.status)
     router.push(`/chantiers/${chantier.id}/succes`)
   }
 
   return (
     <MobileShell>
-      <div style={{ width: '100%', minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', color: '#111827' }}>
-        <StatusBar />
+      <div style={{ width: '100%', minHeight: '100vh', background: T.bg, display: 'flex',
+        flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', color: T.text }}>
+        <StatusBar dark={T.dark} />
         <FormHeader title="Récapitulatif" backHref={`/chantiers/${chantier.id}/signature-client`} />
 
-        <div className="pf-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="pf-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Client */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <SectionLabel icon={IconUser}>Client</SectionLabel>
+            <SLabel icon={IconUser}>Client</SLabel>
             <Card>
-              <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>{chantier.nom_client}</div>
-              <div style={{ fontSize: 14, color: '#6B7280', marginTop: 2 }}>{chantier.type_travaux}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#6B7280' }}>
-                  <IconMapPin size={16} sw={1.75} />{chantier.adresse}
+              <div style={{ fontSize: 17, fontWeight: 700, color: T.text }}>{chantier.nom_client}</div>
+              <div style={{ fontSize: 14, color: T.subtle, marginTop: 2 }}>{chantier.type_travaux}</div>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.subtle }}>
+                  <IconMapPin size={14} sw={1.75} />{chantier.adresse}
                 </div>
                 {chantier.tel_client && (
-                  <a href={`tel:${chantier.tel_client}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: PRIMARY, textDecoration: 'none', fontWeight: 500 }}>
-                    <IconPhone size={16} sw={1.75} />{chantier.tel_client}
+                  <a href={`tel:${chantier.tel_client}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: PRIMARY, textDecoration: 'none', fontWeight: 500 }}>
+                    <IconPhone size={14} sw={1.75} />{chantier.tel_client}
                   </a>
                 )}
               </div>
             </Card>
           </div>
 
-          {/* Financial */}
+          {/* Financier */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <SectionLabel icon={IconEuro}>Financier</SectionLabel>
-            <Card padding={4}>
+            <SLabel icon={IconEuro}>Financier</SLabel>
+            <Card pad={0}>
               <div style={{ padding: '0 16px' }}>
                 <Row label="Montant HT" value={formatEur(ht)} />
                 <Row label="TVA 20%" value={formatEur(tax)} />
-                <Row label="Montant TTC" value={formatEur(chantier.montant_ttc)} bold last />
+                <Row label="Total TTC" value={formatEur(chantier.montant_ttc)} bold last />
               </div>
             </Card>
           </div>
 
-          {/* Documents */}
+          {/* Signatures */}
+          {(chantier.sig_artisan_url || chantier.sig_client_url) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <SLabel>Signatures collectées</SLabel>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[{ label: 'Artisan', url: chantier.sig_artisan_url }, { label: 'Client', url: chantier.sig_client_url }].map(s => (
+                  <div key={s.label} style={{ flex: 1, background: T.card, border: `1px solid ${s.url ? '#22C55E50' : T.border}`, borderRadius: 12, padding: '10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: s.url ? '#22C55E' : T.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {s.url && <IconCheck size={11} sw={3} color="#fff" />}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: s.url ? '#22C55E' : T.muted }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Document */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <SectionLabel icon={IconFile}>Documents</SectionLabel>
+            <SLabel icon={IconFile}>Document</SLabel>
             <Card>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                <PdfThumbnail />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>Procès-verbal de réception</div>
-                  <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, lineHeight: 1.4 }}>Envoyé par email aux deux parties à la clôture.</div>
-                  <button style={{ marginTop: 10, padding: 0, background: 'none', border: 'none', color: PRIMARY, fontFamily: 'inherit', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                    <IconDownload size={15} sw={2} />Prévisualiser
-                  </button>
+                {/* Mini PDF thumb */}
+                <div style={{ width: 52, height: 68, background: '#fff', borderRadius: 6, border: `1px solid ${T.border}`, padding: 6, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ height: 3, background: PRIMARY, borderRadius: 1, width: '70%', marginBottom: 4 }} />
+                  {[...Array(5)].map((_, i) => <div key={i} style={{ height: 2, background: T.border, borderRadius: 1, marginBottom: 3, width: `${60 + (i % 2) * 20}%` }} />)}
+                  <div style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 6, fontWeight: 700, color: PRIMARY }}>PDF</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.text, lineHeight: 1.3 }}>Procès-verbal de réception</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 3, lineHeight: 1.4 }}>Généré et envoyé automatiquement à la clôture.</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 12, color: '#22C55E', fontWeight: 600 }}>
+                    <IconCheck size={12} sw={2.5} />Signatures incluses
+                  </div>
                 </div>
               </div>
             </Card>
@@ -139,12 +140,13 @@ export default function RecapClient({ chantier }: { chantier: Chantier }) {
 
           {/* Options */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <SectionLabel>Options de clôture</SectionLabel>
-            <Card padding={4}>
+            <SLabel>Options de clôture</SLabel>
+            <Card pad={0}>
               <div style={{ padding: '0 16px' }}>
-                <CheckboxRow checked={paid} onToggle={() => setPaid(p => !p)} label="Paiement reçu sur place" />
-                <div style={{ height: 1, background: '#F3F4F6' }} />
-                <CheckboxRow checked={review} onToggle={() => setReview(r => !r)} label="Envoyer demande d'avis Google" subLabel="SMS envoyé immédiatement au client" />
+                <CheckRow checked={paid} onToggle={() => setPaid(p => !p)} label="Paiement reçu sur place" />
+                <div style={{ height: 1, background: T.divider }} />
+                <CheckRow checked={review} onToggle={() => setReview(r => !r)}
+                  label="Demande d'avis Google" sub="SMS envoyé au client après clôture" />
               </div>
             </Card>
           </div>
@@ -152,11 +154,11 @@ export default function RecapClient({ chantier }: { chantier: Chantier }) {
 
         <BottomBar>
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 12, color: '#6B7280', textAlign: 'center' }}>
-              En clôturant, le PDF sera généré et envoyé.
+            <div style={{ fontSize: 12, color: T.muted, textAlign: 'center' }}>
+              Le procès-verbal sera généré et envoyé par email.
             </div>
             <PrimaryButton onClick={handleCloture} loading={loading} icon={IconRocket} pulse>
-              Clôturer maintenant
+              Clôturer le chantier
             </PrimaryButton>
           </div>
         </BottomBar>
