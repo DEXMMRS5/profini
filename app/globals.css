@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0F1729 0%, #1A2540 100%);
+}
+
+.pf-stage {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.pf-shell {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  background: #F9FAFB;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+@media (min-width: 500px) {
+  .pf-stage {
+    align-items: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at top, rgba(43,164,100,0.08), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(21,53,91,0.25), transparent 50%),
+      linear-gradient(180deg, #0F1729 0%, #1A2540 100%);
+  }
+  .pf-shell {
+    min-height: 812px;
+    height: 812px;
+    max-height: calc(100vh - 48px);
+    border-radius: 48px;
+    border: 10px solid #0a0a0a;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45), 0 0 0 2px rgba(255,255,255,0.04);
+    overflow: hidden;
+  }
+}
+
+.pf-scroll { overflow-y: auto; overflow-x: hidden; }
+.pf-scroll::-webkit-scrollbar { width: 3px; }
+.pf-scroll::-webkit-scrollbar-thumb { background: rgba(21,53,91,0.15); border-radius: 999px; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes successPop {
+  0%   { transform: scale(0); opacity: 0; }
+  50%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 4px 14px rgba(21,53,91,0.4); }
+  50%       { box-shadow: 0 6px 22px rgba(21,53,91,0.65); }
+}
+
+.anim-slide-up   { animation: slideUp 0.35s ease-out both; }
+.anim-fade-in    { animation: fadeIn 0.3s ease-out both; }
+.anim-success    { animation: successPop 0.55s cubic-bezier(.34,1.56,.64,1) both; }
+.anim-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
