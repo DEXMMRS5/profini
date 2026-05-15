@@ -43,6 +43,7 @@ export const IconX = (p: IconProps) => <Icon {...p}><path d="M6 6l12 12M18 6l-12
 export const IconRotateCcw = (p: IconProps) => <Icon {...p}><path d="M9 14l-4 -4 4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></Icon>
 export const IconHand = (p: IconProps) => <Icon {...p}><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6" /><path d="M11 11V4a1.5 1.5 0 0 1 3 0v7" /><path d="M14 10V5a1.5 1.5 0 0 1 3 0v9" /><path d="M17 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1 -7 7h-1a7 7 0 0 1 -7 -7l-2 -3.5a1.5 1.5 0 0 1 2.6 -1.5L8 11" /></Icon>
 export const IconDownload = (p: IconProps) => <Icon {...p}><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5 5 -5" /><path d="M12 4v12" /></Icon>
+export const IconStar = (p: IconProps) => <Icon {...p}><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z" /></Icon>
 export const IconRocket = (p: IconProps) => <Icon {...p}><path d="M4 13a8 8 0 0 1 7 -7 5 5 0 0 1 5 5 8 8 0 0 1 -7 7v-3l-2 -2" /><path d="M7 14a4.6 4.6 0 0 0 -3 4 4.6 4.6 0 0 0 4 -3" /><circle cx="14" cy="9" r="1" /></Icon>
 export const IconFile = (p: IconProps) => <Icon {...p}><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21H7a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /></Icon>
 export const IconTrendingUp = (p: IconProps) => <Icon {...p}><path d="M3 17l6 -6 4 4 8 -8" /><path d="M14 7h7v7" /></Icon>

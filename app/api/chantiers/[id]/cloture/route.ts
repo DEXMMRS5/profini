@@ -5,6 +5,15 @@ import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
 
+async function pathToBase64(serviceClient: ReturnType<typeof createServiceClient> extends Promise<infer T> ? T : never, path: string): Promise<string | null> {
+  try {
+    const { data, error } = await serviceClient.storage.from('signatures').download(path)
+    if (error || !data) { console.error('[sig] download error', error); return null }
+    const arr = await data.arrayBuffer()
+    return `data:image/png;base64,${Buffer.from(arr).toString('base64')}`
+  } catch (e) { console.error('[sig] pathToBase64 error', e); return null }
+}
+
 async function urlToBase64(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { cache: 'no-store' })
@@ -30,58 +39,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (fetchErr || !chantier) return NextResponse.json({ error: 'Chantier introuvable' }, { status: 404 })
 
   const { data: artisan } = await supabase.from('artisans').select('*').eq('id', user.id).single()
-  const serviceClient = await createServiceClient()
+  const sc = await createServiceClient()
 
-  // ── Signatures : signed URL → base64 pour le renderer PDF ──────────────────
-  async function getSignedBase64(publicUrl: string | null | undefined): Promise<string | null> {
-    if (!publicUrl) return null
-    // Extraire le path depuis l'URL publique
-    const match = publicUrl.match(/\/signatures\/(.+?)(\?|$)/)
-    const path  = match?.[1]
-    if (!path) return await urlToBase64(publicUrl)
-    const { data } = await serviceClient.storage.from('signatures').createSignedUrl(decodeURIComponent(path), 600)
-    if (!data?.signedUrl) return null
-    return await urlToBase64(data.signedUrl)
+  // ── Signatures → base64 (priorité: path stocké, fallback: URL signée) ───────
+  async function getSigBase64(path: string | null | undefined, url: string | null | undefined): Promise<string | null> {
+    if (path) {
+      const b64 = await pathToBase64(sc, path)
+      if (b64) return b64
+    }
+    if (url) return urlToBase64(url)
+    return null
   }
 
   const [sigArtisanB64, sigClientB64] = await Promise.all([
-    getSignedBase64(chantier.sig_artisan_url),
-    getSignedBase64(chantier.sig_client_url),
+    getSigBase64(chantier.sig_artisan_path, chantier.sig_artisan_url),
+    getSigBase64(chantier.sig_client_path,  chantier.sig_client_url),
   ])
 
-  // ── Logo artisan (public) → base64 ─────────────────────────────────────────
+  console.log('[cloture] sig artisan:', sigArtisanB64 ? `OK (${sigArtisanB64.length} chars)` : 'ABSENT')
+  console.log('[cloture] sig client :', sigClientB64  ? `OK (${sigClientB64.length} chars)` : 'ABSENT')
+
+  // ── Logo artisan → base64 ────────────────────────────────────────────────────
   const logoB64 = artisan?.logo_url ? await urlToBase64(artisan.logo_url) : null
 
-  console.log('[cloture] sig artisan:', sigArtisanB64 ? 'ok' : 'absent')
-  console.log('[cloture] sig client :', sigClientB64  ? 'ok' : 'absent')
-  console.log('[cloture] logo       :', logoB64        ? 'ok' : 'absent')
-
-  // ── Génération PDF ──────────────────────────────────────────────────────────
+  // ── Génération PDF ────────────────────────────────────────────────────────────
   const closedAt = new Date().toISOString()
   const pdfBuffer = await generatePV({
-    chantier: {
-      ...chantier,
-      sig_artisan_url: sigArtisanB64 ?? undefined,
-      sig_client_url:  sigClientB64  ?? undefined,
-      closed_at: closedAt,
-    },
-    artisan: artisan ? { ...artisan, logo_url: logoB64 ?? artisan.logo_url } : null,
+    chantier: { ...chantier, sig_artisan_url: sigArtisanB64 ?? undefined, sig_client_url: sigClientB64 ?? undefined, closed_at: closedAt },
+    artisan:  artisan ? { ...artisan, logo_url: logoB64 ?? undefined } : null,
   })
 
-  // ── Upload PDF ──────────────────────────────────────────────────────────────
+  // ── Upload PDF ────────────────────────────────────────────────────────────────
   const pdfPath = `${user.id}/${id}/pv-${Date.now()}.pdf`
-  const { error: pdfErr } = await serviceClient.storage
-    .from('pdfs').upload(pdfPath, pdfBuffer, { contentType: 'application/pdf', upsert: true })
+  await sc.storage.from('pdfs').upload(pdfPath, pdfBuffer, { contentType: 'application/pdf', upsert: true })
+  const { data: signedPdf } = await sc.storage.from('pdfs').createSignedUrl(pdfPath, 60 * 60 * 24 * 365)
+  const pdfUrl = signedPdf?.signedUrl
 
-  let pdfUrl: string | undefined
-  if (!pdfErr) {
-    const { data } = await serviceClient.storage.from('pdfs').createSignedUrl(pdfPath, 60 * 60 * 24 * 365)
-    pdfUrl = data?.signedUrl
-  } else {
-    console.error('[cloture] PDF upload error', pdfErr)
-  }
-
-  // ── Mise à jour chantier ────────────────────────────────────────────────────
+  // ── Mise à jour chantier ──────────────────────────────────────────────────────
   await supabase.from('chantiers').update({
     status:       paiement_recu ? 'paye' : 'cloture',
     paiement_recu, demande_avis,
@@ -89,30 +83,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     closed_at:    closedAt,
   }).eq('id', id)
 
-  // ── Email ───────────────────────────────────────────────────────────────────
-  if (chantier.email_client && process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 'your-resend-api-key') {
+  // ── Email client (PV + demande avis Google) ───────────────────────────────────
+  const hasResend = process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 'your-resend-api-key'
+  if (chantier.email_client && hasResend) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY)
+      const nomArtisan = artisan?.nom_entreprise ?? artisan?.nom ?? 'Votre artisan'
+      const googleBtn = demande_avis && artisan?.google_review_url
+        ? `<div style="margin-top:24px;padding-top:20px;border-top:1px solid #E5E7EB;">
+             <p style="font-size:14px;color:#374151;margin:0 0 12px;">Êtes-vous satisfait des travaux ? Votre avis compte beaucoup !</p>
+             <a href="${artisan.google_review_url}" style="display:inline-block;background:#4285F4;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">⭐ Laisser un avis Google</a>
+           </div>`
+        : ''
       await resend.emails.send({
-        from: `${artisan?.nom_entreprise ?? 'ProFini'} <noreply@profini.fr>`,
+        from: `${nomArtisan} <noreply@profini.fr>`,
         to: [chantier.email_client],
-        subject: `Procès-verbal de réception — ${chantier.type_travaux}`,
+        subject: `✅ Procès-verbal de réception — ${chantier.type_travaux}`,
         html: `
-          <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:32px;">
+          <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#fff;">
             ${artisan?.logo_url ? `<img src="${artisan.logo_url}" style="height:48px;margin-bottom:24px;object-fit:contain;" alt="logo"/>` : ''}
-            <h1 style="color:#15355B;font-size:22px;margin:0 0 16px;">Procès-verbal de réception de travaux</h1>
-            <p>Bonjour ${chantier.nom_client},</p>
-            <p>Votre artisan <strong>${artisan?.nom ?? ''}</strong> ${artisan?.nom_entreprise ? `(${artisan.nom_entreprise})` : ''} vous transmet le procès-verbal signé.</p>
-            <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-              <tr style="background:#F9FAFB;"><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;">Travaux</td><td style="padding:10px;border:1px solid #E5E7EB;">${chantier.type_travaux}</td></tr>
-              <tr><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;">Adresse</td><td style="padding:10px;border:1px solid #E5E7EB;">${chantier.adresse}</td></tr>
-              <tr style="background:#F9FAFB;"><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;">Montant TTC</td><td style="padding:10px;border:1px solid #E5E7EB;font-weight:700;">${chantier.montant_ttc.toFixed(2)} €</td></tr>
+            <h1 style="color:#15355B;font-size:22px;margin:0 0 8px;">Travaux terminés ✅</h1>
+            <p style="color:#374151;margin:0 0 20px;font-size:15px;">Bonjour ${chantier.nom_client},</p>
+            <p style="color:#374151;font-size:14px;line-height:1.6;">
+              <strong>${nomArtisan}</strong> vous transmet le procès-verbal signé pour les travaux réalisés.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+              <tr style="background:#F9FAFB;"><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;color:#374151;">Travaux</td><td style="padding:10px;border:1px solid #E5E7EB;color:#111827;">${chantier.type_travaux}</td></tr>
+              <tr><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;color:#374151;">Adresse</td><td style="padding:10px;border:1px solid #E5E7EB;color:#111827;">${chantier.adresse}</td></tr>
+              <tr style="background:#F9FAFB;"><td style="padding:10px;border:1px solid #E5E7EB;font-weight:600;color:#374151;">Montant TTC</td><td style="padding:10px;border:1px solid #E5E7EB;color:#15355B;font-weight:700;">${chantier.montant_ttc.toFixed(2)} €</td></tr>
             </table>
-            ${pdfUrl ? `<a href="${pdfUrl}" style="display:inline-block;background:#15355B;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Télécharger le procès-verbal PDF</a>` : ''}
-            <p style="margin-top:32px;color:#9CA3AF;font-size:12px;">Document généré par ProFini — profini.vercel.app</p>
+            ${pdfUrl ? `<a href="${pdfUrl}" style="display:inline-block;background:#15355B;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">📄 Télécharger le procès-verbal</a>` : ''}
+            ${googleBtn}
+            <p style="margin-top:32px;color:#9CA3AF;font-size:11px;border-top:1px solid #F3F4F6;padding-top:16px;">Document généré via ProFini — profini.vercel.app</p>
           </div>
         `,
       })
+      console.log('[cloture] email envoyé à', chantier.email_client)
     } catch (e) { console.error('[cloture] email error', e) }
   }
 

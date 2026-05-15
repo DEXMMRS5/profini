@@ -10,10 +10,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { variant, dataUrl } = await req.json() as { variant: 'artisan' | 'client'; dataUrl: string }
 
-  // dataUrl = "data:image/png;base64,..."
   const base64 = dataUrl.split(',')[1]
+  if (!base64) return NextResponse.json({ error: 'dataUrl invalide' }, { status: 400 })
+
   const buffer = Buffer.from(base64, 'base64')
-  const path = `${user.id}/${id}/${variant}-${Date.now()}.png`
+  const path   = `${user.id}/${id}/${variant}-${Date.now()}.png`
 
   const { error: uploadError } = await supabase.storage
     .from('signatures').upload(path, buffer, { contentType: 'image/png', upsert: true })
@@ -23,15 +24,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
 
-  const { data: { publicUrl } } = supabase.storage.from('signatures').getPublicUrl(path)
+  // Signed URL longue durée (1 an) pour l'affichage
+  const { data: signed } = await supabase.storage.from('signatures').createSignedUrl(path, 60 * 60 * 24 * 365)
 
-  const field = variant === 'artisan' ? 'sig_artisan_url' : 'sig_client_url'
+  // Stocker AUSSI le path brut pour régénérer des signed URLs lors de la génération PDF
+  const urlField  = variant === 'artisan' ? 'sig_artisan_url'  : 'sig_client_url'
+  const pathField = variant === 'artisan' ? 'sig_artisan_path' : 'sig_client_path'
+
   const { error } = await supabase.from('chantiers')
-    .update({ [field]: publicUrl })
+    .update({ [urlField]: signed?.signedUrl ?? '', [pathField]: path })
     .eq('id', id).eq('artisan_id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  console.log('[POST /api/chantiers/:id/signature] end', variant)
-  return NextResponse.json({ ok: true, url: publicUrl })
+  console.log('[POST /api/chantiers/:id/signature] end', variant, 'path:', path)
+  return NextResponse.json({ ok: true, url: signed?.signedUrl, path })
 }
